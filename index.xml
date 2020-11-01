@@ -27,7 +27,23 @@
       <pubDate>Thu, 05 May 2016 21:48:51 -0700</pubDate>
       
       <guid>/about/</guid>
-      <description>This is a &amp;ldquo;hello world&amp;rdquo; example website for the blogdown package. The theme was forked from @jrutheiser/hugo-lithium-theme and modified by Yihui Xie.</description>
+      <description>Hi, I&amp;rsquo;m Matt.
+(caption: Me and my charmed family)
+I recently graduated from Pitt with a Masters in Applied Statistics. I got to work on some exciting projects, I&amp;rsquo;m working on some others, and I&amp;rsquo;m looking to work on more.
+Here I&amp;rsquo;ll be blogging mostly with R and Python about my interests in climate and the justice system, with some tips, reflections, and art along the way.
+Thanks to the blogdown package by Yihui Xie, and the lithium theme by Jonathan Rutheiser.</description>
+    </item>
+    
+    <item>
+      <title>License</title>
+      <link>/license/</link>
+      <pubDate>Thu, 05 May 2016 21:48:51 -0700</pubDate>
+      
+      <guid>/license/</guid>
+      <description>All code appearing on this blog is licensed under MIT unless otherwise specified.
+MIT License
+Copyright (c) 2020 matt.broerman@gmail.com
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</description>
     </item>
     
     <item>
