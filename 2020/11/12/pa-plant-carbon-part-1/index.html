@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.70.0" />
+
+
+<title>How Much Carbon Do Pennsylvania Electricity Plants Emit? - Matt Broerman</title>
+<meta property="og:title" content="How Much Carbon Do Pennsylvania Electricity Plants Emit? - Matt Broerman">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/bikebull.jpeg"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://github.com/mjbroerman">GitHub</a></li>
+    
+    <li><a href="https://twitter.com/mjbroerman">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+
+    <h1 class="article-title">How Much Carbon Do Pennsylvania Electricity Plants Emit?</h1>
+
+    
+    <span class="article-date">2020-11-12</span>
+    
+
+    <div class="article-content">
+      
+<link href="index_files/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="index_files/anchor-sections/anchor-sections.js"></script>
+
+
+<div class="figure">
+<img src="index_files/west-penn-power-plant.jpeg" width="800" alt="" />
+<p class="caption">old West Penn power plant near Pittsburgh</p>
+</div>
+<div id="fossil-fuels-at-electricity-plants" class="section level2">
+<h2>Fossil fuels at electricity plants</h2>
+<p>Today I am going to prepare a couple of sample time series data sets for an upcoming project and do some preliminary exploratory data analysis. In the next post, I’ll do a bit of time series modeling in order analyze the trends in the data set. In some future post, I will walk through developing a more sophisticated model and use it to answer some more specific questions.</p>
+<p>I went to school in Pittsburgh, and I recently saw <a href="https://www.post-gazette.com/business/powersource/2020/09/15/Pennsylvania-carbon-emissions-budget-RGGI-power-plants-advances-EQB/stories/202009150121">this story</a> about the governor’s plan to cap-and-trade carbon emissions from power plants. How will this effect production in the region? How many carbon-emission could this avert? How have carbon emissions from power plants changed over time? Fortunately, the Energy Information Administration (EIA) provides a <a href="https://www.eia.gov/opendata/register.php">public API</a> and <a href="https://ropensci.org/">rOpenSci</a> maintains a <a href="https://github.com/ropensci/eia">nice wrapper</a> in R, so we can start to answer these questions.</p>
+<pre class="r"><code>library(tidyverse)
+library(glue)
+library(eia)
+
+# set with usethis::edit_r_environ(&quot;project&quot;)
+eia_set_key(Sys.getenv(&quot;EIA_API&quot;))</code></pre>
+</div>
+<div id="apis-and-the-r-ecosystem" class="section level2">
+<h2>APIs and the R Ecosystem</h2>
+<p>First, a shoutout! I have found that R ecosystem has very well-maintain packages for interacting with government data APIs–for instance, <a href="https://github.com/walkerke/tidycensus">tidycensus</a> for US Census data, <a href="https://github.com/mountainMath/cancensus">cancensus</a> for Canadian Census data, and <a href="https://github.com/ropensci/eia">eia</a> for the Energy Information Agency data. Having a well-designed API wrapper for sifting through public datasets is yeoman’s work and deeply appreciated. All of these implement an interface using tidyverse concepts, like returning the data and the directory structure as tibbles (a variant of a dataframe). Hadley Wickham has a line somewhere that the tidyverse tries to solve the most common analysis bottlenecks, which are more analyst-centered than compute-centered. This is nowhere more true than when working with new APIs, so using API wrappers with tidyverse concepts is a huge help.</p>
+</div>
+<div id="navigating-the-api" class="section level2">
+<h2>Navigating the API</h2>
+<p>First, we’ll step through a directory tree of possible data series with <code>eia_cats()</code>. It returns an object containing two tibbles: one represents the parent directory, and one represents either child directories or child datasets.</p>
+<pre class="r"><code># root directory
+eia_cats()
+#&gt; $category
+#&gt; # A tibble: 1 x 3
+#&gt;   category_id name          notes
+#&gt;   &lt;chr&gt;       &lt;chr&gt;         &lt;chr&gt;
+#&gt; 1 371         EIA Data Sets &quot;&quot;   
+#&gt; 
+#&gt; $childcategories
+#&gt; # A tibble: 14 x 2
+#&gt;    category_id name                               
+#&gt;          &lt;int&gt; &lt;chr&gt;                              
+#&gt;  1           0 Electricity                        
+#&gt;  2       40203 State Energy Data System (SEDS)    
+#&gt;  3      714755 Petroleum                          
+#&gt;  4      714804 Natural Gas                        
+#&gt;  5      711224 Total Energy                       
+#&gt;  6      717234 Coal                               
+#&gt;  7      829714 Short-Term Energy Outlook          
+#&gt;  8      964164 Annual Energy Outlook              
+#&gt;  9     1292190 Crude Oil Imports                  
+#&gt; 10     2123635 U.S. Electric System Operating Data
+#&gt; 11     2134384 International Energy Data          
+#&gt; 12     2251604 CO2 Emissions                      
+#&gt; 13     2631064 International Energy Outlook       
+#&gt; 14     2889994 U.S. Nuclear Outages</code></pre>
+<p>By specifying the <code>category_id</code> we can descend the directory–e.g. <code>eia_cat(0)</code> returns all electricity categories. We will retrieve series for all “electric fuel consumption” for each plant in Pennsylvania. The data series are not well-documented, but I [looked it up] (<a href="https://openei.org/doe-opendata/dataset/9ef7c547-17fc-4fe8-87e8-ffb27fcaafd9/resource/fe39dd4b-30cf-4dd6-b15e-617b0eb1a2f0/download/data.dictionaryeia.9232009.doc" class="uri">https://openei.org/doe-opendata/dataset/9ef7c547-17fc-4fe8-87e8-ffb27fcaafd9/resource/fe39dd4b-30cf-4dd6-b15e-617b0eb1a2f0/download/data.dictionaryeia.9232009.doc</a>) and this is the fuel consumed to generate electricity. They break it down by fuel type and generator type. For now, we’ll look at all fuels and all generation on 20 plants. Using <code>glue::glue</code>, we extract the IDs we get back from the API to format further strings for looking up series.</p>
+<pre class="r"><code># electric fuel consumption
+ids &lt;- eia_cats(902969)$childcategories %&gt;% 
+  separate(name, c(&#39;name_id&#39;, &#39;name_plt&#39;), &quot; &quot;, extra = &quot;merge&quot;) %&gt;% 
+  extract(name_id, c(&quot;name_id&quot;), regex = &quot;(\\d+)&quot;) %&gt;% 
+  extract(name_plt, c(&quot;name_plt&quot;), regex = &quot;([\\w\\s]+)&quot;) %&gt;% 
+  mutate(name_plt = str_trim(name_plt)) %&gt;% 
+  mutate(all_all_id = glue(&quot;ELEC.PLANT.CONS_EG_BTU.{name_id}-ALL-ALL.M&quot;, 
+                           name_id = name_id)) %&gt;% 
+  mutate(dfo_all_id = glue(&quot;ELEC.PLANT.CONS_EG_BTU.{name_id}-DFO-ALL.M&quot;, 
+                           name_id = name_id)) %&gt;% 
+  mutate(ng_all_id = glue(&quot;ELEC.PLANT.CONS_EG_BTU.{name_id}-NG-ALL.M&quot;, 
+                          name_id = name_id))
+
+glimpse(ids)
+#&gt; Rows: 269
+#&gt; Columns: 6
+#&gt; $ category_id &lt;int&gt; 2668, 2669, 2670, 2671, 2672, 2673, 2674, 2675, 2676, 267…
+#&gt; $ name_id     &lt;chr&gt; &quot;3096&quot;, &quot;3098&quot;, &quot;3109&quot;, &quot;3110&quot;, &quot;3111&quot;, &quot;3112&quot;, &quot;3113&quot;, &quot;…
+#&gt; $ name_plt    &lt;chr&gt; &quot;Brunot Island&quot;, &quot;Elrama Power Plant&quot;, &quot;Hamilton&quot;, &quot;Hunte…
+#&gt; $ all_all_id  &lt;glue&gt; &quot;ELEC.PLANT.CONS_EG_BTU.3096-ALL-ALL.M&quot;, &quot;ELEC.PLANT.CON…
+#&gt; $ dfo_all_id  &lt;glue&gt; &quot;ELEC.PLANT.CONS_EG_BTU.3096-DFO-ALL.M&quot;, &quot;ELEC.PLANT.CON…
+#&gt; $ ng_all_id   &lt;glue&gt; &quot;ELEC.PLANT.CONS_EG_BTU.3096-NG-ALL.M&quot;, &quot;ELEC.PLANT.CONS…</code></pre>
+<p>Now we fetch the data from the API using these lookup-strings, and unnest them into single tibble.</p>
+<pre class="r"><code># sample length, I&#39;ll prepare full length later
+all_all_data &lt;- eia_series(ids$all_all_id[1:20])
+
+# unnest
+tidy_aa_data &lt;- all_all_data %&gt;% 
+  left_join(select(ids, c(&quot;all_all_id&quot;, &quot;name_id&quot;, &quot;name_plt&quot;)), 
+            by = c(&quot;series_id&quot; = &quot;all_all_id&quot;)) %&gt;% 
+  select(units, name_plt, lat, lon, data) %&gt;% 
+  unnest(cols = data)
+
+glimpse(tidy_aa_data)
+#&gt; Rows: 4,298
+#&gt; Columns: 8
+#&gt; $ units    &lt;chr&gt; &quot;MMBtu&quot;, &quot;MMBtu&quot;, &quot;MMBtu&quot;, &quot;MMBtu&quot;, &quot;MMBtu&quot;, &quot;MMBtu&quot;, &quot;MMBtu…
+#&gt; $ name_plt &lt;chr&gt; &quot;Brunot Island&quot;, &quot;Brunot Island&quot;, &quot;Brunot Island&quot;, &quot;Brunot I…
+#&gt; $ lat      &lt;chr&gt; &quot;40.464851&quot;, &quot;40.464851&quot;, &quot;40.464851&quot;, &quot;40.464851&quot;, &quot;40.4648…
+#&gt; $ lon      &lt;chr&gt; &quot;-80.043761&quot;, &quot;-80.043761&quot;, &quot;-80.043761&quot;, &quot;-80.043761&quot;, &quot;-80…
+#&gt; $ value    &lt;dbl&gt; 11, 60, 119181, 291532, 144780, 158219, 39321, 33, 11, 22, 3…
+#&gt; $ date     &lt;date&gt; 2019-12-01, 2019-11-01, 2019-10-01, 2019-09-01, 2019-08-01,…
+#&gt; $ year     &lt;int&gt; 2019, 2019, 2019, 2019, 2019, 2019, 2019, 2019, 2019, 2019, …
+#&gt; $ month    &lt;int&gt; 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 12, 11, 10, 9, 8, 7, …</code></pre>
+</div>
+<div id="basic-eda" class="section level2">
+<h2>Basic EDA</h2>
+<p>Here I adapt Hadley Wickham’s <img src="https://www.youtube.com/watch?v=go5Au01Jrvs" alt="video" /> on exploratory data analysis. We start by noting some irregularities in the data.</p>
+<pre class="r"><code>tidy_aa_data %&gt;% 
+  count(year) %&gt;% 
+  head()
+#&gt; # A tibble: 6 x 2
+#&gt;    year     n
+#&gt;   &lt;int&gt; &lt;int&gt;
+#&gt; 1  2001   227
+#&gt; 2  2002   240
+#&gt; 3  2003   226
+#&gt; 4  2004   240
+#&gt; 5  2005   228
+#&gt; 6  2006   216
+tidy_aa_data %&gt;% 
+  count(name_plt) %&gt;% 
+  head()
+#&gt; # A tibble: 6 x 2
+#&gt;   name_plt                          n
+#&gt;   &lt;chr&gt;                         &lt;int&gt;
+#&gt; 1 Blossburg                       227
+#&gt; 2 Brunot Island                   225
+#&gt; 3 Conemaugh                       235
+#&gt; 4 Elrama Power Plant              157
+#&gt; 5 Hamilton                        228
+#&gt; 6 Homer City Generating Station   236
+tidy_aa_data %&gt;% 
+  count(name_plt) %&gt;% 
+  count(n) %&gt;% 
+  head()
+#&gt; Storing counts in `nn`, as `n` already present in input
+#&gt; ℹ Use `name = &quot;new_name&quot;` to pick a new name.
+#&gt; # A tibble: 6 x 2
+#&gt;       n    nn
+#&gt;   &lt;int&gt; &lt;int&gt;
+#&gt; 1    47     1
+#&gt; 2   157     1
+#&gt; 3   204     1
+#&gt; 4   216     1
+#&gt; 5   225     1
+#&gt; 6   226     1</code></pre>
+<p>So across plants for the same time period, we have different numbers of data points. How are these recorded? Are these NAs, zeros, or something else?</p>
+<pre class="r"><code>tidy_aa_data %&gt;% 
+  group_by(name_plt) %&gt;% 
+  count(nas = sum(is.na(value))) %&gt;% 
+  head()
+#&gt; # A tibble: 6 x 3
+#&gt; # Groups:   name_plt [6]
+#&gt;   name_plt                        nas     n
+#&gt;   &lt;chr&gt;                         &lt;int&gt; &lt;int&gt;
+#&gt; 1 Blossburg                         0   227
+#&gt; 2 Brunot Island                     0   225
+#&gt; 3 Conemaugh                         0   235
+#&gt; 4 Elrama Power Plant                0   157
+#&gt; 5 Hamilton                          0   228
+#&gt; 6 Homer City Generating Station     0   236
+
+tidy_aa_data %&gt;% 
+  group_by(name_plt) %&gt;% 
+  summarise(mean = mean(value), zeros = sum(value == 0)) %&gt;% 
+  arrange(desc(mean)) %&gt;% 
+  head()
+#&gt; `summarise()` ungrouping output (override with `.groups` argument)
+#&gt; # A tibble: 6 x 3
+#&gt;   name_plt                          mean zeros
+#&gt;   &lt;chr&gt;                            &lt;dbl&gt; &lt;int&gt;
+#&gt; 1 Keystone                      9463596.     0
+#&gt; 2 Conemaugh                     9407419.     0
+#&gt; 3 Homer City Generating Station 8686103.     0
+#&gt; 4 Seward                        2108629.    18
+#&gt; 5 Shawville                     1886518.     9
+#&gt; 6 Elrama Power Plant            1228973.    23</code></pre>
+<p>It seems for each plant NAs aren’t used, and zeros are used from often to never. Since this is administrative survey data, there’s a good chance that 0 values are non-report values. Where do these show up?</p>
+<pre class="r"><code>
+plants &lt;- tidy_aa_data %&gt;% 
+  mutate(my_date = year + (month - 1) / 12)
+
+plants %&gt;% ggplot(aes(my_date, value), alpha = 2/10) +
+  geom_line(aes(group = name_plt)) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, some plants in PA&quot;)</code></pre>
+<p><img src="figs/unnamed-chunk-7-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>
+plants %&gt;% ggplot(aes(my_date, value)) +
+  geom_line(aes(group = name_plt), alpha = 2/10) +
+  scale_y_log10() +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs (log 10)&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, some plants in PA&quot;)
+#&gt; Warning: Transformation introduced infinite values in continuous y-axis</code></pre>
+<p><img src="figs/unnamed-chunk-7-2.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>In the log-scaled plot above, these show up as spiked vertical lines. We could interpolate these as missing values by using <code>tidyr::fill()</code> to add the previous value as the missing value. This should be relatively robust assuming that we have no long sequences of zeros. Do we?</p>
+<pre class="r"><code>plants %&gt;% 
+  mutate(is_zero = (value == 0)) %&gt;% 
+  group_by(name_plt, 
+           grp = with(rle(is_zero), 
+                      rep(seq_along(lengths), lengths))) %&gt;%
+  mutate(Counter = seq_along(grp)) %&gt;%
+  ungroup() %&gt;%
+  select(-grp) %&gt;% 
+  filter(value == 0) %&gt;% 
+  count(Counter)
+#&gt; # A tibble: 24 x 2
+#&gt;    Counter     n
+#&gt;      &lt;int&gt; &lt;int&gt;
+#&gt;  1       1   141
+#&gt;  2       2    60
+#&gt;  3       3    36
+#&gt;  4       4    19
+#&gt;  5       5     5
+#&gt;  6       6     5
+#&gt;  7       7     3
+#&gt;  8       8     3
+#&gt;  9       9     3
+#&gt; 10      10     3
+#&gt; # … with 14 more rows</code></pre>
+<p>There are probably more elegant ways of doing this, but from this count we can see that only five times was zero reported for more than five months, and once for 24 months. If this were a high-stakes analysis, we’d like to know why those zeros are there. For now, we will just interpolate.</p>
+<pre class="r"><code>
+# interpolate
+plants &lt;- plants %&gt;% 
+  mutate(value = na_if(value, 0)) %&gt;% 
+  fill(value)
+
+# interpolated
+plants %&gt;% 
+  ggplot(aes(my_date, value)) +
+  geom_line(aes(group = name_plt), alpha = 2/10) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs &quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, some plants in PA (interpolated)&quot;)</code></pre>
+<p><img src="figs/unnamed-chunk-9-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>
+# interpolated scaled
+plants %&gt;% 
+  ggplot(aes(my_date, value)) +
+  geom_line(aes(group = name_plt), alpha = 2/10) + 
+  scale_y_log10() +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs (log 10)&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, some plants in PA (interpolated)&quot;)</code></pre>
+<p><img src="figs/unnamed-chunk-9-2.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>We see that most of the consecutive zeros are in the smaller plants. Since there seems to be three bands of interest, for now, let’s focus on the bigger plants by filtering out the smallest band that is crowded at the bottom.</p>
+</div>
+<div id="focus" class="section level2">
+<h2>Focus</h2>
+<pre class="r"><code>plants_means &lt;- plants %&gt;% 
+  group_by(name_plt) %&gt;% 
+  summarise(mean = mean(value)) %&gt;% 
+  arrange(desc(mean))
+#&gt; `summarise()` ungrouping output (override with `.groups` argument)
+
+ggplot(plants_means, aes(x = mean)) +
+geom_histogram()
+#&gt; `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
+<p><img src="figs/unnamed-chunk-10-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>We want to remove that tall bar.</p>
+<pre class="r"><code>
+plants_means &lt;- plants_means %&gt;% 
+  mutate(size = ifelse(mean &lt; 5e5, &quot;sm&quot;, ifelse(mean &lt; 5e6, &quot;md&quot;, &quot;lg&quot;)))
+
+plants_means %&gt;% 
+  ggplot(aes(x = mean, fill = size)) +
+  geom_histogram()
+#&gt; `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
+<p><img src="figs/unnamed-chunk-11-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>
+plants_big &lt;- plants %&gt;% 
+  right_join(plants_means %&gt;% filter(size == &#39;md&#39; | size == &#39;lg&#39;))
+#&gt; Joining, by = &quot;name_plt&quot;</code></pre>
+<p>Now that we have a just two groups, let’s take another look at the line plot. We could fit a kernel smoothing function to the whole data set, but it makes sense to fit one to each band. In the next post, we can see if the trend line changes in more informative of the underlying signal if we do some modeling.</p>
+<pre class="r"><code>plants_big %&gt;% ggplot(aes(my_date, value)) +
+  geom_line(aes(group = name_plt)) +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, large and medium plants in PA (interpolated)&quot;)
+#&gt; `geom_smooth()` using method = &#39;gam&#39; and formula &#39;y ~ s(x, bs = &quot;cs&quot;)&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-12-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>
+plants_big %&gt;% ggplot(aes(my_date, value, color = size)) +
+  geom_line(aes(group = name_plt)) +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, large medium plants in PA (interpolated)&quot;)
+#&gt; `geom_smooth()` using method = &#39;gam&#39; and formula &#39;y ~ s(x, bs = &quot;cs&quot;)&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-12-2.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>So we’ve explored the coverage of our data, selected a portion to focus on, fixed what we think is missing data, and set up some clusters. We’ll save our progress for today and pick it up with modeling next time.</p>
+<pre class="r"><code>write_csv(plants_big, file = &quot;samp_pa_elec_cons_plants_big.csv&quot;)</code></pre>
+</div>
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+<script src="/js/math-code.js"></script>
+<script async src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
+
+    
+  </body>
+</html>
+

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>timeseries on Matt Broerman</title>
+    <link>/categories/timeseries/</link>
+    <description>Recent content in timeseries on Matt Broerman</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 13 Nov 2020 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="/categories/timeseries/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Modeling Seasonal Variation in Fuel Consumption</title>
+      <link>/2020/11/13/pa-plant-carbon-part-2/</link>
+      <pubDate>Fri, 13 Nov 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/11/13/pa-plant-carbon-part-2/</guid>
+      <description>Simple time series model of fuel comsumption at power plants.</description>
+    </item>
+    
+    <item>
+      <title>How Much Carbon Do Pennsylvania Electricity Plants Emit?</title>
+      <link>/2020/11/12/pa-plant-carbon-part-1/</link>
+      <pubDate>Thu, 12 Nov 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/11/12/pa-plant-carbon-part-1/</guid>
+      <description>EDA on electricity plants in Pennsylvania using the tidyverse and the eia package.</description>
+    </item>
+    
+  </channel>
+</rss>

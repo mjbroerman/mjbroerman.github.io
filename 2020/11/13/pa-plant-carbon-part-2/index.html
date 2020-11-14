@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.70.0" />
+
+
+<title>Modeling Seasonal Variation in Fuel Consumption - Matt Broerman</title>
+<meta property="og:title" content="Modeling Seasonal Variation in Fuel Consumption - Matt Broerman">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/bikebull.jpeg"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://github.com/mjbroerman">GitHub</a></li>
+    
+    <li><a href="https://twitter.com/mjbroerman">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+
+    <h1 class="article-title">Modeling Seasonal Variation in Fuel Consumption</h1>
+
+    
+    <span class="article-date">2020-11-13</span>
+    
+
+    <div class="article-content">
+      
+<link href="index_files/anchor-sections/anchor-sections.css" rel="stylesheet" />
+<script src="index_files/anchor-sections/anchor-sections.js"></script>
+
+
+<div class="figure">
+<img src="/2020-11-13-pa-plant-carbon-part-2/index_files/smokey-lucy.png" alt="" />
+<p class="caption">smokey lucy furnace</p>
+</div>
+<div id="modeling-seasonal-variation-in-fuel-consumption" class="section level1">
+<h1>Modeling Seasonal Variation in Fuel Consumption</h1>
+<p>This is a second post in a series on data analysis for “electric fuel consumption” for plants in Pennsylvania–that is, the fossil fuels consumed by power plants to bring us electricity. I will continue to adapt the modeling strategy in <a href="https://www.youtube.com/watch?v=go5Au01Jrvs">this video</a> from Hadley Wickham.</p>
+<p>In the previous post, we</p>
+<ul>
+<li>noticed some peculiarities of our data set,</li>
+<li>interpolated some zero values,</li>
+<li>eyeballed some clustering,</li>
+<li>excluded a cluster, and</li>
+<li>applied trend lines per cluster.</li>
+</ul>
+<p>The data is still rather jagged. How much of this is due to seasonal variation rather than fluctuating demand? We should be able to discern the trends more clearer once this is removed. Let’s model it, first by starting with a single instance, and then apply that to the rest of our sample data set.</p>
+<pre class="r"><code>library(tidyverse)
+library(glue)
+library(eia)
+
+# set with usethis::edit_r_environ(&quot;project&quot;)
+eia_set_key(Sys.getenv(&quot;EIA_API&quot;))</code></pre>
+<div id="psa" class="section level2">
+<h2>PSA</h2>
+<p>An aside! This post got me thinking about my own electricity consumption. It turns out there’s a company that supplies electricity from 100% renewable sources at comparable rates, all from Pennsylvania–which I figure is better, since it sends the local demand signal. Our home is in the process of making the switch, I’ll keep you posted. I have no connection to the company.</p>
+<p>For the Pittsburgh area:
+<a href="https://www.communityenergyinc.com/products/duquesne-light-pa" class="uri">https://www.communityenergyinc.com/products/duquesne-light-pa</a></p>
+</div>
+<div id="model" class="section level2">
+<h2>Model</h2>
+<pre class="r"><code># path to files from previous post
+path &lt;- &quot;../2020-11-12-pa-plant-carbon-emissions/pa_elec_cons_plants_big.csv&quot;
+plants_big &lt;- read_csv(path)</code></pre>
+<p>Let’s get started by looking at a single plant: Homer City Generating Station.</p>
+<pre class="r"><code>
+homer &lt;- plants_big %&gt;% filter(str_detect(name_plt, &quot;Homer&quot;))
+homer %&gt;% count(name_plt)
+#&gt; # A tibble: 1 x 2
+#&gt;   name_plt                          n
+#&gt;   &lt;chr&gt;                         &lt;int&gt;
+#&gt; 1 Homer City Generating Station   236
+
+homer %&gt;% ggplot(aes(my_date, value)) +
+  geom_line(aes(group = name_plt)) +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, Homer (interpolated)&quot;)</code></pre>
+<p><img src="figs/unnamed-chunk-3-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>Let’s align each year and see if there’s a trend.</p>
+<pre class="r"><code>homer %&gt;% ggplot(aes(month, value)) +
+  geom_line(aes(group = year, color = year)) +
+  scale_color_viridis_c() +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Months, 2001-2020&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, Homer (interpolated)&quot;)
+#&gt; `geom_smooth()` using method = &#39;loess&#39; and formula &#39;y ~ x&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-4-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>We see a modest dip during the spring. Perhaps this is when residents use the least electricity for climate control. We can see that pattern for the other months seems to shift in the later years. We should find out if this pattern is consistent across years and locations. For now, let’s model this variation as if it was consistent across time and location.</p>
+<pre class="r"><code>library(modelr)
+
+homer_mod &lt;- lm(log(value) ~ factor(month), data = homer)
+
+homer %&gt;% 
+  add_predictions(homer_mod) %&gt;% 
+  ggplot(aes(my_date, pred)) +
+  geom_line() +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Predicted Yearly Variation, Mil. of BTUs&quot;,
+       title = &quot;Modeled Seasonal Trend, Homer (interpolated)&quot;)</code></pre>
+<p><img src="figs/unnamed-chunk-5-1.png" width="700px" style="display: block; margin: auto;" />
+Here’s the seasonal variation that will be removed. Note that it repeats every year. Now let’s plot the residual variation after the seasonal variation is removed by our model.</p>
+<pre class="r"><code>homer %&gt;% 
+  add_residuals(homer_mod) %&gt;% 
+  ggplot(aes(my_date, resid)) +
+  geom_line() +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Predicted Yearly Variation, Mil. of BTUs (log 10)&quot;,
+       title = &quot;Modeled Seasonal Trend, Homer (interpolated)&quot;)
+#&gt; `geom_smooth()` using method = &#39;loess&#39; and formula &#39;y ~ x&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-6-1.png" width="700px" style="display: block; margin: auto;" />
+It’s a little less jagged! Interestingly, the predictions are furthest in the later years, suggesting that some other source of variation is driving the fluctuations.</p>
+</div>
+<div id="extend-the-model-to-every-plant" class="section level2">
+<h2>Extend the model to every plant</h2>
+<pre class="r"><code>by_plant &lt;- plants_big %&gt;% 
+  group_by(name_plt) %&gt;% 
+  nest()
+
+plant_model &lt;- function(df) {
+  lm(log10(value + 1) ~ factor(month), data = df)
+}
+
+detrended &lt;- by_plant %&gt;% 
+  mutate(model = map(data, plant_model),
+         resids = map2(data, model, add_residuals)) %&gt;% 
+  unnest(resids)
+
+plants_big %&gt;% ggplot(aes(my_date, value, color = size)) +
+  geom_line(aes(group = name_plt)) +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, large medium plants in PA (interpolated)&quot;)
+#&gt; `geom_smooth()` using method = &#39;gam&#39; and formula &#39;y ~ s(x, bs = &quot;cs&quot;)&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-7-1.png" width="700px" style="display: block; margin: auto;" /></p>
+<pre class="r"><code>
+ggplot(detrended, aes(my_date, resid, color = size)) +
+  geom_line(aes(group = name_plt)) +
+  geom_smooth(se = FALSE) +
+  labs(x = &quot;Date&quot;,
+       y = &quot;Millions of BTUs&quot;,
+       title = &quot;Monthly fuel MMBTUs for electricity, large and medium plants in PA (interpolated, without seasonal trend)&quot;)
+#&gt; `geom_smooth()` using method = &#39;gam&#39; and formula &#39;y ~ s(x, bs = &quot;cs&quot;)&#39;</code></pre>
+<p><img src="figs/unnamed-chunk-7-2.png" width="700px" style="display: block; margin: auto;" /></p>
+<p>Interesting. If we compare the seasonally detrended plot to the naive plot from our <a href="2020/11/12/pa-plant-carbon-emissions">earlier post</a>, it appears that much of the variation in the large plants was due to yearly variation. Meanwhile, the medium-sized plants were seeing a decline in fuel consumption since around 2009, only to have this rebound a bit since 2016. Could this correspond to policy changes in Pennsylvania?</p>
+<p>In this post, we modeled <em>across each year</em> as if they were equivalent <em>within each plant</em>, despite some rather obvious indications that they probably were not. Instead of this, we could model <em>across power plants</em> but <em>within each time period</em>. Sharing information across both series and time is the specialty of Gaussian Processes. We will explore this more sophisticated model in a future post.</p>
+</div>
+</div>
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+
+    
+  </body>
+</html>
+
