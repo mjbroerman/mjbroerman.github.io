@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="generator" content="Hugo 0.70.0" />
+
+
+<title>Yes, but what are Gaussian Processes? - Matt Broerman</title>
+<meta property="og:title" content="Yes, but what are Gaussian Processes? - Matt Broerman">
+
+
+  <link href='/favicon.ico' rel='icon' type='image/x-icon'/>
+
+
+
+  
+
+
+
+
+
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css' rel='stylesheet' type='text/css' />
+
+
+
+<link rel="stylesheet" href="/css/fonts.css" media="all">
+<link rel="stylesheet" href="/css/main.css" media="all">
+
+
+
+  </head>
+  <body>
+    <div class="wrapper">
+      <header class="header">
+        <nav class="nav">
+  <a href="/" class="nav-logo">
+    <img src="/images/bikebull.jpeg"
+         width="50"
+         height="50"
+         alt="Logo">
+  </a>
+
+  <ul class="nav-links">
+    
+    <li><a href="/about/">About</a></li>
+    
+    <li><a href="https://github.com/mjbroerman">GitHub</a></li>
+    
+    <li><a href="https://twitter.com/mjbroerman">Twitter</a></li>
+    
+  </ul>
+</nav>
+
+      </header>
+
+
+<main class="content" role="main">
+
+  <article class="article">
+
+    <h1 class="article-title">Yes, but what are Gaussian Processes?</h1>
+
+    
+    <span class="article-date">2020-12-03</span>
+    
+
+    <div class="article-content">
+      <p>Gaussian processes (GPs) are showing up a lot of places these days: in <a href="https://botorch.org/">hyperparameter search</a>, <a href="https://www.biorxiv.org/content/10.1101/2020.11.03.366674v1">modeling gene transcription</a> and <a href="https://www.pnas.org/content/117/47/29398">neural signals</a>, <a href="https://bookdown.org/rbg/surrogates/">surrogates</a> for more complicated simulated phenomena, and with <a href="https://www.gpflow.org/">litanies</a> of <a href="https://gpytorch.ai/">fast</a> <a href="https://docs.pymc.io/Gaussian_Processes.html">implementations</a>.</p>
+<p>Elsewhere one hears that GPs are a species of stochastic process, a generalized form of Bayesian linear regression, yet also a flexible non-parametric modeling technique. Perhaps most perplexing of all, that GPs sample <em>functions</em>, not parameters. <strong>In this set of conceptual posts for beginners, I will draw connections between these definitions and hopefully build a more intuitive understanding of GPs.</strong></p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#f92672">import</span> numpy <span style="color:#f92672">as</span> np
+<span style="color:#f92672">import</span> pandas <span style="color:#f92672">as</span> pd
+<span style="color:#f92672">import</span> matplotlib.pyplot <span style="color:#f92672">as</span> plt
+
+<span style="color:#f92672">import</span> warnings
+warnings<span style="color:#f92672">.</span>simplefilter(<span style="color:#e6db74">&#39;ignore&#39;</span>)
+
+plt<span style="color:#f92672">.</span>style<span style="color:#f92672">.</span>use([<span style="color:#e6db74">&#39;ggplot&#39;</span>, <span style="color:#e6db74">&#39;blog_post.mplstyle&#39;</span>])
+</code></pre></div><h1 id="part-i-gaussian-process-as-stochastic-process">Part I. Gaussian Process <em>as</em> Stochastic Process</h1>
+<p>Most introductions to GPs do not discuss stochastic processes but rather presume familiarity with them. That&rsquo;s too bad because most people can reason about a random walk or a queue in a grocery store, both examples of stochastic processes, but find GPs more challenging. But even some familiarity with stochastic processes won&rsquo;t clarify GPs without some effort. I first encountered GPs late in a text<a href="#fn1"><!-- raw HTML omitted -->1<!-- raw HTML omitted --></a>, briefly defined and discussed only indirectly through linear operations on them, like their means and variances. We&rsquo;ll start with some simple examples and work up to GPs.</p>
+<h2 id="markovian-stochastic-processes">Markovian Stochastic Processes</h2>
+<p><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Poisson_process.svg/500px-Poisson_process.svg.png" alt="Poisson Process"></p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p>A simple example of a stochastic process is the <em>Poisson process</em> pictured above. It has a state that grows at rate <code>$\lambda$</code>. Since it is continuous-timed, starting at time <code>$t$</code>, at any moment by some increment <code>$s$</code>, it can jump, say from <code>$X(t) = 1$</code> to <code>$X(t + s) = 2$</code>. The probability of jumping over time is defined by its distribution function <code>$F_x(t)$</code>, and since for a Poisson process this is the exponential function <code>$\eqref{eq:exponential}$</code> with a rate of <code>$\lambda$</code>, <code>$F_x(t)$</code> has the specical property that no amount of waiting for a jump makes future jumps more or less likely, i.e. it is <em>memoryless</em>.</p>
+<p>\begin{equation*}
+\ F_x(t) = P_x(\tau \geq t) = e^{-\lambda t}, t \geq 0
+\label{eq:exponential} \tag{1}
+\end{equation*}</p>
+<p>That the future only depends on the present state and not the past is the <em>Markov property</em>. Below are examples of processes that have also have the markov property. By contrast to the Poisson process, this is due not to their probability of jumping as a function of time, but rather the simple property of being cumulative sums&ndash;the next value is a sum of a random value and the current total, but no extra information comes from all the values that came before.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>seed(<span style="color:#ae81ff">42</span>)
+cnts_dt <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>exponential(<span style="color:#ae81ff">1</span>, size<span style="color:#f92672">=</span>(<span style="color:#ae81ff">20</span>, <span style="color:#ae81ff">5</span>))
+cnts_t <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>cumsum(cnts_dt, axis<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)
+disc_t <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">20</span>)
+
+disc_cnts_rvs <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>normal(size<span style="color:#f92672">=</span>(<span style="color:#ae81ff">20</span>, <span style="color:#ae81ff">5</span>), scale<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>cumsum(axis<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)
+cnts_cnts_rvs <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>normal(size<span style="color:#f92672">=</span>(<span style="color:#ae81ff">20</span>, <span style="color:#ae81ff">5</span>), scale<span style="color:#f92672">=</span>cnts_dt)<span style="color:#f92672">.</span>cumsum(axis<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)
+disc_rvs <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>random_integers(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>, (<span style="color:#ae81ff">20</span>, <span style="color:#ae81ff">5</span>))<span style="color:#f92672">.</span>cumsum(axis<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)
+
+fig, axs <span style="color:#f92672">=</span> plt<span style="color:#f92672">.</span>subplots(<span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">2</span>)
+
+(ax1, ax2), (ax3, ax4) <span style="color:#f92672">=</span> axs
+
+ax1<span style="color:#f92672">.</span>step(disc_t, disc_rvs, marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>)
+ax2<span style="color:#f92672">.</span>step(cnts_t, disc_rvs, marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>)
+ax3<span style="color:#f92672">.</span>plot(disc_t, disc_cnts_rvs, marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>)
+ax4<span style="color:#f92672">.</span>plot(cnts_t, cnts_cnts_rvs, marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>)
+
+<span style="color:#66d9ef">for</span> ax <span style="color:#f92672">in</span> axs<span style="color:#f92672">.</span>flat:
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_xaxis()<span style="color:#f92672">.</span>set_visible(False)
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(False)
+    
+plt<span style="color:#f92672">.</span>show()
+</code></pre></div><p><img src="what_are_gps-v1_files/what_are_gps-v1_4_0.png" alt="png"></p>
+<p>We can roughly think of stochastic processes as discrete- or continuous-parameter (here: time), and continuous- or discrete-valued.</p>
+<p>The lower two plots are examples of <em>Wiener processes</em> (in this case, being discrete-time is just a special case of continuous-time). They are <em>Gaussian Processes</em> since each value is just the sum of draws from <code>np.random.normal()</code>, simple sums are <em>linear combinations</em>, and any linear combination of normal distributions is also a normal distribution (right? check the video for pathological cases). They are models of <em>Brownian motion</em>, the motion that atoms in a medium have.</p>
+<p>The reason is intuitive. We can think of normally distributed values as those that result from the addition of many independent effects, which atoms in a medium presumably have (think <a href="https://mjskay.github.io/plinko/">plinko</a>). Now for the sum of standard normal distributions, the deviations cancel each other and converge on the mean, but the variation in those deviations accummulate. Hence we scale the variance by the length of each time step <code>$dt$</code>, thinking of this as a sum of very many small increments. In the lower-left example, the random variables <code>disc_cnts_rvs</code> are scaled by the constant <code>$dt = 1$</code> while in the lower-right example the random variables <code>cnts_cnts_rvs</code> are scaled by the distances <code>cnts_dt</code>.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">n_bins<span style="color:#f92672">=</span><span style="color:#ae81ff">30</span>
+x <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>randn(<span style="color:#ae81ff">1000</span>, <span style="color:#ae81ff">3</span>)
+plt<span style="color:#f92672">.</span>hist(x, n_bins, density<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>, histtype<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;bar&#39;</span>, stacked<span style="color:#f92672">=</span>True)
+plt<span style="color:#f92672">.</span>gca()<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_xaxis()<span style="color:#f92672">.</span>set_visible(False)
+plt<span style="color:#f92672">.</span>gca()<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(False)
+plt<span style="color:#f92672">.</span>title(<span style="color:#e6db74">&#39;The Sum of Gaussians is Gaussian&#39;</span>)
+plt<span style="color:#f92672">.</span>show()
+</code></pre></div><p><img src="what_are_gps-v1_files/what_are_gps-v1_7_0.png" alt="png"></p>
+<h2 id="second-order-processes">Second Order Processes</h2>
+<p>So far we&rsquo;ve used some rules for defining our variables and how to combine them. We can use functions to specify the rules. The mean of our distubutions <code>$X(t)$</code> were always zero, i.e. <code>$M_X(t) = 0$</code>. As cumulative sums, our rules also say that the value at at later time can potentially tell us something about the preceding moment, since a large value probably had a large value previously too. Hence in general, two later moments will covary more than two earlier moments or</p>
+<p>$$K_X(t_1, t_2) \leq K_X(t_{1} + s, t_{2} + s).$$</p>
+<!-- raw HTML omitted -->
+<p>It turns out<a href="#fn2"><!-- raw HTML omitted -->2<!-- raw HTML omitted --></a> that for a Wiener process, the covariance function is just</p>
+<p>$$K(x, y) = min(x, y)$$.</p>
+<!-- raw HTML omitted -->
+<p>There are many possible covariance functions or <em>kernels</em>. I define a few common ones below.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#75715e"># kernels</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">constant_kernel</span>(x, y):
+    <span style="color:#66d9ef">return</span> <span style="color:#ae81ff">1</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">linear_kernel</span>(x, y, l<span style="color:#f92672">=</span><span style="color:#ae81ff">1.0</span>): 
+    <span style="color:#66d9ef">return</span> l<span style="color:#f92672">*</span>x<span style="color:#f92672">*</span>y
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">brownian_kernel</span>(x, y):
+    <span style="color:#66d9ef">return</span> np<span style="color:#f92672">.</span>min([x, y])
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">sq_exp_kernel</span>(x, y, l<span style="color:#f92672">=</span><span style="color:#ae81ff">1.0</span>):
+    <span style="color:#66d9ef">return</span> np<span style="color:#f92672">.</span>exp(<span style="color:#f92672">-</span>(x <span style="color:#f92672">-</span> y) <span style="color:#f92672">**</span> <span style="color:#ae81ff">2</span> <span style="color:#f92672">/</span> (l<span style="color:#f92672">**</span><span style="color:#ae81ff">2</span> <span style="color:#f92672">*</span> <span style="color:#ae81ff">2</span>)) 
+
+<span style="color:#75715e"># construction</span>
+
+<span style="color:#66d9ef">def</span> <span style="color:#a6e22e">construct_k</span>(X, kernel_fn, <span style="color:#f92672">**</span>kwargs):
+    n <span style="color:#f92672">=</span> len(X)
+    C <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros((n, n))
+    <span style="color:#66d9ef">for</span> i <span style="color:#f92672">in</span> range(n):
+        <span style="color:#66d9ef">for</span> j <span style="color:#f92672">in</span> range(n):
+            C[i, j] <span style="color:#f92672">=</span> kernel_fn(X[i], X[j], <span style="color:#f92672">**</span>kwargs)
+    <span style="color:#66d9ef">return</span> C
+</code></pre></div><p>With <code>$M_X(t)$</code> and <code>$K_X(t_1, t_2)$</code> in hand, we can define a much wider class of stochastic processes, since we can specify pairwise covariances across the entire domain of <code>$X$</code>. And rather than calculating random cumulative sums, we just sample from the multivariate Gaussian defined by our functions:</p>
+<p>$$ X(t) \sim N(M_X(t), K_X(t_1, t_2))$$</p>
+<p>One sample from this distribution over <code>$[X_0, X_k]$</code>, where <code>$K(x, y) = min(x, y)$</code>, is equivalent a single walk of the Wiener process over the same domain. In fact, from many &ldquo;walks&rdquo; we can work back to the covert covariance structure that instantiated them.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">n <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span> <span style="color:#75715e"># process length</span>
+k <span style="color:#f92672">=</span> <span style="color:#ae81ff">100</span> <span style="color:#75715e"># samples</span>
+X <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>linspace(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">10</span>, n)
+fig, axs <span style="color:#f92672">=</span> plt<span style="color:#f92672">.</span>subplots(<span style="color:#ae81ff">2</span>, <span style="color:#ae81ff">2</span>)
+
+fig<span style="color:#f92672">.</span>suptitle(<span style="color:#e6db74">&#34;Top: Covariance to Samples; Bottom: Samples to Covariances&#34;</span>, 
+             size<span style="color:#f92672">=</span><span style="color:#ae81ff">20</span>, x<span style="color:#f92672">=</span><span style="color:#ae81ff">0.2</span>)
+((ax1, ax2), (ax3, ax4)) <span style="color:#f92672">=</span> axs
+
+<span style="color:#66d9ef">for</span> ax <span style="color:#f92672">in</span> axs<span style="color:#f92672">.</span>flat:
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_xaxis()<span style="color:#f92672">.</span>set_visible(False)
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(False)
+
+<span style="color:#75715e"># Covariance -&gt; Samples</span>
+K <span style="color:#f92672">=</span> construct_k(X, brownian_kernel)
+mu <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(len(X))
+sigma <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>identity(<span style="color:#ae81ff">1</span>)
+samples <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>multivariate_normal(mu, K, k)<span style="color:#f92672">.</span>T
+ax1<span style="color:#f92672">.</span>plot(X, samples[:,:<span style="color:#ae81ff">5</span>], marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>, linewidth<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+ax1<span style="color:#f92672">.</span>violinplot(samples<span style="color:#f92672">.</span>T, X, 
+               showmeans<span style="color:#f92672">=</span>True, 
+               showextrema<span style="color:#f92672">=</span>False)
+ax2<span style="color:#f92672">.</span>imshow(K)
+ax2<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(True)
+
+<span style="color:#75715e"># Samples -&gt; Covariance</span>
+samples <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>normal(size<span style="color:#f92672">=</span>(n, k), scale<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)<span style="color:#f92672">.</span>cumsum(axis<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>) <span style="color:#75715e"># 100 series</span>
+ax3<span style="color:#f92672">.</span>plot(X, samples[:,:<span style="color:#ae81ff">5</span>], marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>, linewidth<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+ax3<span style="color:#f92672">.</span>violinplot(samples<span style="color:#f92672">.</span>T, X, 
+               showmeans<span style="color:#f92672">=</span>True, 
+               showextrema<span style="color:#f92672">=</span>False)
+ax4<span style="color:#f92672">.</span>imshow(np<span style="color:#f92672">.</span>cov(samples))
+ax4<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(True)
+
+plt<span style="color:#f92672">.</span>tight_layout()
+plt<span style="color:#f92672">.</span>show()
+</code></pre></div><p><img src="what_are_gps-v1_files/what_are_gps-v1_11_0.png" alt="png"></p>
+<p>When we find the covariance for one hundred series of cumulative sums, we can recover the covariance structure. Although approximated, in the limit it is identical to the brownian kernel! Why is that?</p>
+<p>Consider how each step in a random cumulative sum series is related to every other. Over many samples, the first steps are just a set of independent draws, so the covariance is zero. And likewise for the first draws and every sum of subsequent draws, hence why the top and left edge are also zero. But the set of 2-sums of IID distributions should covary more&ndash;but no covariance is gained by between 2-sums and 3-sums. So the covariance between sums of iid will be defined by lesser of the sums. And this is the <code>np.min()</code> operation we used to define our <code>brownian_kernel</code> for the gaussian process.</p>
+<p>Note also that each time step is normally distributed with increasing variance, as we would expect by the diagonal of the covariance structure defining variance. However having control over each component of covariance between time steps allows us to define a <em>much</em> wider class of functions.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">n <span style="color:#f92672">=</span> <span style="color:#ae81ff">20</span> <span style="color:#75715e"># process length</span>
+k <span style="color:#f92672">=</span> <span style="color:#ae81ff">50</span> <span style="color:#75715e"># samples</span>
+X <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>linspace(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">10</span>, n)
+fig, axs <span style="color:#f92672">=</span> plt<span style="color:#f92672">.</span>subplots(<span style="color:#ae81ff">3</span>, <span style="color:#ae81ff">2</span>, figsize<span style="color:#f92672">=</span>(<span style="color:#ae81ff">16</span>, <span style="color:#ae81ff">12</span>))
+
+fig<span style="color:#f92672">.</span>suptitle(<span style="color:#e6db74">&#34;Varieties of GPs&#34;</span>, size<span style="color:#f92672">=</span><span style="color:#ae81ff">20</span>, x<span style="color:#f92672">=</span><span style="color:#ae81ff">0.11</span>)
+
+fns <span style="color:#f92672">=</span> [linear_kernel, sq_exp_kernel, brownian_kernel]
+
+<span style="color:#66d9ef">for</span> i, row <span style="color:#f92672">in</span> enumerate(axs):
+    (ax1, ax2) <span style="color:#f92672">=</span> row
+    K <span style="color:#f92672">=</span> construct_k(X, fns[i])
+    mu <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(len(X))
+    sigma <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>identity(<span style="color:#ae81ff">1</span>)
+    samples <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>multivariate_normal(mu, K, k)<span style="color:#f92672">.</span>T
+    ax1<span style="color:#f92672">.</span>plot(X, samples[:,:<span style="color:#ae81ff">5</span>], marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>, linewidth<span style="color:#f92672">=</span><span style="color:#ae81ff">1</span>)
+    ax1<span style="color:#f92672">.</span>violinplot(samples<span style="color:#f92672">.</span>T, X, 
+                   showmeans<span style="color:#f92672">=</span>True, 
+                   showextrema<span style="color:#f92672">=</span>False)
+    ax2<span style="color:#f92672">.</span>imshow(K)
+
+plt<span style="color:#f92672">.</span>tight_layout()
+plt<span style="color:#f92672">.</span>show()
+</code></pre></div><p><img src="what_are_gps-v1_files/what_are_gps-v1_13_0.png" alt="png"></p>
+<p>Just as sums of Gaussians are Gaussians, so sums of GPs are GPs. When the elements of their covariances are added, the resulting covariances combine the features of their components.</p>
+<div class="highlight"><pre style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python">k <span style="color:#f92672">=</span> <span style="color:#ae81ff">5</span>
+X <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>arange(<span style="color:#ae81ff">0</span>, <span style="color:#ae81ff">1</span>, <span style="color:#f92672">.</span><span style="color:#ae81ff">01</span>)<span style="color:#f92672">.</span>reshape(<span style="color:#f92672">-</span><span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">1</span>)
+mu <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>zeros(len(X))
+
+fig, axs <span style="color:#f92672">=</span> plt<span style="color:#f92672">.</span>subplots(<span style="color:#ae81ff">1</span>, <span style="color:#ae81ff">3</span>, sharey<span style="color:#f92672">=</span>True)
+
+titles <span style="color:#f92672">=</span> [<span style="color:#e6db74">&#39;Brownian&#39;</span>, <span style="color:#e6db74">&#39;Squared Exponential&#39;</span>, <span style="color:#e6db74">&#39;Brownian + Squared Exponential&#39;</span>]
+
+K <span style="color:#f92672">=</span> [
+    construct_k(X, brownian_kernel), 
+    construct_k(X, sq_exp_kernel, l<span style="color:#f92672">=</span><span style="color:#ae81ff">0.05</span>),
+    construct_k(X, sq_exp_kernel, l<span style="color:#f92672">=</span><span style="color:#ae81ff">0.05</span>) <span style="color:#f92672">+</span> <span style="color:#ae81ff">1.5</span> <span style="color:#f92672">*</span> construct_k(X, brownian_kernel)
+    ]
+
+<span style="color:#66d9ef">for</span> i, ax <span style="color:#f92672">in</span> enumerate(axs):
+    samples <span style="color:#f92672">=</span> np<span style="color:#f92672">.</span>random<span style="color:#f92672">.</span>multivariate_normal(mu, K[i], k)
+    ax<span style="color:#f92672">.</span>plot(X, samples<span style="color:#f92672">.</span>T, marker<span style="color:#f92672">=</span><span style="color:#e6db74">&#39;o&#39;</span>, linewidth<span style="color:#f92672">=</span><span style="color:#ae81ff">0</span>)
+    ax<span style="color:#f92672">.</span>set_title(titles[i])
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_xaxis()<span style="color:#f92672">.</span>set_visible(False)
+    ax<span style="color:#f92672">.</span>axes<span style="color:#f92672">.</span>get_yaxis()<span style="color:#f92672">.</span>set_visible(False)
+
+plt<span style="color:#f92672">.</span>show()
+</code></pre></div><p><img src="what_are_gps-v1_files/what_are_gps-v1_15_0.png" alt="png"></p>
+<p>In the next post in this series, I will look at how their covariance structures make Gaussian Processes not only ideal candidates for flexible, yet composible models, but also good for structuring the relationship between sets of parameters in bayesian inference.</p>
+<h4 id="references">References</h4>
+<!-- raw HTML omitted -->
+<p><!-- raw HTML omitted --> Hoel, Introduction to Stochastic Processes, p.122 <!-- raw HTML omitted --></p>
+<p><a href="http://www.gaussianprocess.org/gpml/chapters/RWB.pdf">C. E. Rasmussen &amp; C. K. I. Williams, Gaussian Processes for Machine Learning, Appendix B.</a></p>
+<!-- raw HTML omitted -->
+
+    </div>
+  </article>
+
+  
+
+
+</main>
+
+      <footer class="footer">
+        <ul class="footer-links">
+          <li>
+            <a href="/index.xml" type="application/rss+xml" target="_blank">RSS feed</a>
+          </li>
+          <li>
+            <a href="https://gohugo.io/" class="footer-links-kudos">Made with <img src="/images/hugo-logo.png" alt="Img link to Hugo website" width="22" height="22"></a>
+          </li>
+        </ul>
+      </footer>
+
+    </div>
+    
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/python.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+    
+<script src="/js/math-code.js"></script>
+<script async src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
+
+    
+  </body>
+</html>
+

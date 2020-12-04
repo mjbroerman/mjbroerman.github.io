@@ -12,6 +12,15 @@
     
     
     <item>
+      <title>Yes, but what are Gaussian Processes?</title>
+      <link>/2020/12/03/but-what-are-gps/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/2020/12/03/but-what-are-gps/</guid>
+      <description>Part I of a conceptual introduction to Gaussian processes, focusing on understanding GPs as stochastic processes.</description>
+    </item>
+    
+    <item>
       <title>Modeling Seasonal Variation in Fuel Consumption</title>
       <link>/2020/11/13/pa-plant-carbon-part-2/</link>
       <pubDate>Fri, 13 Nov 2020 00:00:00 +0000</pubDate>

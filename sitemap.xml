@@ -3,8 +3,43 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
+    <loc>/categories/beginner/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
     <loc>/categories/</loc>
-    <lastmod>2020-11-13T00:00:00+00:00</lastmod>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/conceptual/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/gps/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/post/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/python/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/categories/timeseries/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>/2020/12/03/but-what-are-gps/</loc>
+    <lastmod>2020-12-03T00:00:00+00:00</lastmod>
   </url>
   
   <url>
@@ -23,22 +58,12 @@
   </url>
   
   <url>
-    <loc>/post/</loc>
-    <lastmod>2020-11-13T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
     <loc>/categories/rstats/</loc>
     <lastmod>2020-11-13T00:00:00+00:00</lastmod>
   </url>
   
   <url>
     <loc>/categories/tidy/</loc>
-    <lastmod>2020-11-13T00:00:00+00:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>/categories/timeseries/</loc>
     <lastmod>2020-11-13T00:00:00+00:00</lastmod>
   </url>
   

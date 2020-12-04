@@ -6,10 +6,55 @@
     <description>Recent content in Categories on Matt Broerman</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 13 Nov 2020 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Thu, 03 Dec 2020 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="/categories/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>beginner</title>
+      <link>/categories/beginner/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/categories/beginner/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>conceptual</title>
+      <link>/categories/conceptual/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/categories/conceptual/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>gps</title>
+      <link>/categories/gps/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/categories/gps/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>python</title>
+      <link>/categories/python/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/categories/python/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>timeseries</title>
+      <link>/categories/timeseries/</link>
+      <pubDate>Thu, 03 Dec 2020 00:00:00 +0000</pubDate>
+      
+      <guid>/categories/timeseries/</guid>
+      <description></description>
+    </item>
     
     <item>
       <title>climate</title>
@@ -44,15 +89,6 @@
       <pubDate>Fri, 13 Nov 2020 00:00:00 +0000</pubDate>
       
       <guid>/categories/tidy/</guid>
-      <description></description>
-    </item>
-    
-    <item>
-      <title>timeseries</title>
-      <link>/categories/timeseries/</link>
-      <pubDate>Fri, 13 Nov 2020 00:00:00 +0000</pubDate>
-      
-      <guid>/categories/timeseries/</guid>
       <description></description>
     </item>
     
