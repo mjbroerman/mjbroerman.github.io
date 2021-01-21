@@ -45,10 +45,8 @@
       
       <guid>/about/</guid>
       <description>Hi, I&amp;rsquo;m Matt.
-(caption: Me and my charmed family)
-I recently graduated from Pitt with a Masters in Applied Statistics. I got to work on some exciting projects, I&amp;rsquo;m working on some others, and I&amp;rsquo;m looking to work on more.
-Here I&amp;rsquo;ll be blogging mostly with R and Python about my interests in climate and the justice system, with some tips, reflections, and art along the way.
-Thanks to the blogdown package by Yihui Xie, and the lithium theme by Jonathan Rutheiser.</description>
+I recently graduated from the University of Pittsburgh with a Master in Applied Statistics. I got to work on some exciting projects in computational biology, I&amp;rsquo;m currently working on some collaborations with others, and I&amp;rsquo;m looking to work on some more. Please drop me a line at matt dot broerman at gmail dott com. Résumé available upon request.
+Here I&amp;rsquo;ll be blogging mostly with R and Python about my interests in climate, the justice system, and bayesian methods, with some tips, reflections, and art along the way.</description>
     </item>
     
     <item>
@@ -61,6 +59,15 @@ Thanks to the blogdown package by Yihui Xie, and the lithium theme by Jonathan R
 MIT License
 Copyright (c) 2020 matt.broerman@gmail.com
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</description>
+    </item>
+    
+    <item>
+      <title>Projects</title>
+      <link>/projects/</link>
+      <pubDate>Thu, 05 May 2016 21:48:51 -0700</pubDate>
+      
+      <guid>/projects/</guid>
+      <description>Interpretable factors in scRNA-seq with disentangled generative models New microfluidic platforms have enabled bioinformatics at an unprecedented level of resolution for single cells, but interpreting these vast arrays poses new challenges. Principle component analysis is a common tool for dimension reduction and interpretation, but does not perform well in this context due to nonlinear coordination between genes. I helped develop a method that has it both ways, modelling nonlinearities with variational autoencoders while remaining interpretable.</description>
     </item>
     
   </channel>
